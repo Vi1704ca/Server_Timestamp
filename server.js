@@ -1,80 +1,107 @@
-import express from 'express';
+import express from "express"; 
 
-const app = express()
+const app = express(); 
+app.use(express.json()); 
 
-const HOST = '127.0.0.1'
-const PORT = 3001
+const HOST = "localhost"; 
+const PORT = 3000; 
 
-app.get('/timestamp', (req, res) => {
-  const now = moment();
-  res.json({
-    timestamp: now.format('YYYY-MM-DD HH:mm:ss')
-  });
-});
-
-const products = [
+let users = [ 
     { 
         id: 1, 
-        name: 'Cheetos', 
-        price: 10.99, 
-        category: 'Corn snack' 
-    },
-    { 
-        id: 2, 
-        name: 'Chupa Chups', 
-        price: 19.99, 
-        category: 'Confectionery' 
-    },
-    { 
-        id: 3, 
-        name: 'Mountain Dew', 
-        price: 5.99, 
-        category: 'Carbonated drink' 
-    },
-    { 
-        id: 4, 
-        name: 'Doritos', 
-        price: 12.99, 
-        category: 'Corn snack' 
-    },
-    { 
-        id: 5, 
-        name: 'Snickers', 
-        price: 15.99, 
-        category: 'Confectionery' 
-    },
-];
+        name: "Artyom", 
+        password: "112233qwe", 
+    }, 
+]; 
+
+let products = [];
+
+async function createUser(user) { 
+    return new Promise((resolve, reject) => { 
+        setTimeout(() => { 
+            users = [...users, user] 
+            resolve(user); 
+        }) 
+    }) 
+} 
+
+async function addProduct(newProduct, fail) {
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            if (fail === "true") {
+                reject();
+            } else {
+                products = [...products, newProduct]
+                resolve(newProduct);
+            }
+        })
+    })
+}
+
+app.get("/users", (req, res) => { 
+    res.status(200).json(users); 
+}); 
+
+app.post('/register', async (req, res) => { 
+    console.log(req.body) 
+    const { name, password } = req.body; 
+    if (typeof name !== "string" || !name.trim() || typeof password !== "string" || !password.trim()){ 
+        return res.status(422).json({ 
+            message: "Invalid product data" 
+        }) 
+    } 
+    const newUser = { 
+        id: users.length + 1, 
+        name: name, 
+        password: password 
+    }; 
+    try { 
+        const result = await createUser(newUser); 
+        res.status(201).json(result) 
+    } catch (error) { 
+        console.log(error) 
+        res.status(500).json({ 
+            message: "Internal server error" 
+        }) 
+    } 
+}) 
 
 app.get('/products', (req, res) => {
-  const { take, category } = req.query;
-  let filteredProducts = products;
-
-  if (category) {
-    filteredProducts = filteredProducts.filter((product) => product.category === category);
-  }
-  if (!take) {
-    return res.status(200).json(filteredProducts);
-  }
-  const takeNum = Number(take);
-
-  if (!Number.isInteger(takeNum) || takeNum < 0) {
-    return res.status(400).json({ message: "take must be a non-negative integer" });
-  }
-  filteredProducts = filteredProducts.slice(0, takeNum);
-  return res.status(200).json(filteredProducts);
-});     
-
-app.get('/products/:id', (req, res) => {
-  const { id } = req.params;
-  const idNum = Number(id);
-  const product = products.find((product) => product.id === idNum);
-
-  if (!product) {
-    return res.status(404).json({ message: "product not found" });
-  }
-  return res.status(200).json(product);
+    res.status(200).json(products);
 });
 
-app.listen(PORT, HOST, () => {
-    console.log(`http://${HOST}:${PORT}`)
+app.post('/products', async (req, res) => {
+    console.log(req.body)
+    const { name, price, category, image } = req.body;
+    if (typeof name !== "string" || !name.trim() || typeof price !== "number" || price <= 0 || typeof category !== "string" || !category.trim()){
+        return res.status(422).json({
+            message: "Invalid product data"
+        })
+    }
+    const isDuplicate = products.find((product) => product.name === name);
+    if (isDuplicate){
+        return res.status(409).json({
+            message: "Conflict"
+        })
+    }
+    const newProduct = {
+        id: products.length + 1,
+        name: name,
+        price: price,
+        category: category,
+        image: image ? image : ""
+    };
+    try {
+        const result = await addProduct(newProduct, req.query.fail);
+        res.status(201).json(result)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({
+            message: "Internal server error"
+        })
+    }
 })
+
+app.listen(PORT, HOST, () => { 
+    console.log(`Server is running on http://${HOST}:${PORT}`); 
+});
